@@ -233,6 +233,16 @@ def get_all_tasks() -> list:
     return rows
 
 
+def get_personal_tasks() -> list:
+    """Retorna todas as tasks pessoais (is_agent = 0), incluindo ocultas."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(f"SELECT {COLS} FROM tasks WHERE is_agent = 0 ORDER BY id ASC")
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+
 def search_tasks(query: str) -> list:
     conn = get_connection()
     cursor = conn.cursor()

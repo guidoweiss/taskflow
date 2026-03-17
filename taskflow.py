@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from db import init_db
 from tasks import (add_task, move_task, delete_task, get_task, tag_task,
-                   get_all_tasks, search_tasks, edit_task, set_hidden,
+                   get_all_tasks, get_personal_tasks, search_tasks, edit_task, set_hidden,
                    auto_hide_stale, auto_promote_due, get_hidden_tasks, VALID_PRIORITIES,
                    add_relation, remove_relation, get_relations,
                    add_project, get_project, get_all_projects, archive_project,
@@ -60,49 +60,58 @@ def err(msg):
 
 def help_text():
     print(f"""
-  {BOLD}taskflow{RESET} — Gerenciador de tarefas
+  {BOLD}taskflow{RESET} — Gerenciador de tarefas pessoal
 
-  {CYAN}Comandos:{RESET}
-    {BOLD}taskflow{RESET}                              Mostra o board
-    {BOLD}taskflow add{RESET} "título" ["desc"]        Adiciona tarefa no backlog
-    {BOLD}taskflow todo{RESET} <id>                    Move para To Do
-    {BOLD}taskflow done{RESET} <id>                    Move para Done
-    {BOLD}taskflow back{RESET} <id>                    Move de volta para Backlog
-    {BOLD}taskflow tag{RESET} <id> "tag1,tag2"        Define tags de uma tarefa
-    {BOLD}taskflow edit{RESET} <id> title "valor"      Edita o título
-    {BOLD}taskflow edit{RESET} <id> desc "valor"       Edita a descrição
+  {CYAN}Board:{RESET}
+    {BOLD}taskflow{RESET}                               Board kanban pessoal
+    {BOLD}taskflow mini{RESET}                          Board compacto
+    {BOLD}taskflow filter{RESET} <tag>                  Filtra board por tag
+    {BOLD}taskflow search{RESET} "termo"                Busca em títulos e descrições
+
+  {CYAN}Tasks pessoais:{RESET}
+    {BOLD}taskflow add{RESET} "título" ["desc"]         Adiciona tarefa ao backlog
+    {BOLD}taskflow todo{RESET} <id>                     Move para To Do
+    {BOLD}taskflow done{RESET} <id>                     Move para Done
+    {BOLD}taskflow back{RESET} <id>                     Move de volta para Backlog
+    {BOLD}taskflow show{RESET} <id>                     Detalhes de uma tarefa
+    {BOLD}taskflow show all{RESET}                      Lista todas as tarefas pessoais
+    {BOLD}taskflow rm{RESET} <id>                       Remove uma tarefa
+    {BOLD}taskflow hide{RESET} <id>                     Oculta uma tarefa
+    {BOLD}taskflow unhide{RESET} <id>                   Traz tarefa oculta de volta ao backlog
+    {BOLD}taskflow hidden{RESET}                        Lista tarefas ocultas
+    {BOLD}taskflow tag{RESET} <id> "tag"                Define tag da tarefa
+    {BOLD}taskflow edit{RESET} <id> title "valor"       Edita o título
+    {BOLD}taskflow edit{RESET} <id> desc "valor"        Edita a descrição
     {BOLD}taskflow edit{RESET} <id> priority alta|media|baixa  Define prioridade
-    {BOLD}taskflow edit{RESET} <id> due YYYY-MM-DD     Define prazo
+    {BOLD}taskflow edit{RESET} <id> due YYYY-MM-DD      Define prazo  ({GRAY}due clear{RESET} para remover)
     {BOLD}taskflow edit{RESET} <id> link "https://..."  Define link de apoio
-    {BOLD}taskflow edit{RESET} <id> plan "passo 1\npasso 2"  Define plano de execução
-    {BOLD}taskflow filter{RESET} <tag>                 Filtra board por tag
-    {BOLD}taskflow search{RESET} "termo"               Busca por título ou descrição
-    {BOLD}taskflow rm{RESET} <id>                      Remove tarefa
-    {BOLD}taskflow show{RESET} <id>                    Detalhes de uma tarefa
-    {BOLD}taskflow show all{RESET}                     Lista todas as tarefas com detalhes
-    {BOLD}taskflow hidden{RESET}                       Lista tarefas ocultas
-    {BOLD}taskflow hide{RESET} <id>                    Oculta uma tarefa manualmente
-    {BOLD}taskflow unhide{RESET} <id>                  Traz uma tarefa oculta de volta ao backlog
+    {BOLD}taskflow edit{RESET} <id> plan "..."          Define plano de execução
+    {BOLD}taskflow assign{RESET} <task_id> <project_id> Vincula task a um projeto
+    {BOLD}taskflow unassign{RESET} <task_id>            Remove vínculo da task
 
-  {CYAN}Relações:{RESET}
-    {BOLD}taskflow continue{RESET} <id> "título"       Cria nova task que continua de <id>
-    {BOLD}taskflow link{RESET} <id> <from_id>          Linka task existente como continuação de <from_id>
-    {BOLD}taskflow unlink{RESET} <id> <from_id>        Remove a relação entre as tasks
+  {CYAN}Relações (fila encadeada):{RESET}
+    {BOLD}taskflow continue{RESET} <id> "título"        Cria task que continua de <id>
+    {BOLD}taskflow link{RESET} <id> <from_id>           Liga task existente como continuação
+    {BOLD}taskflow unlink{RESET} <id> <from_id>         Remove relação entre tasks
 
   {CYAN}Projetos:{RESET}
-    {BOLD}taskflow project add{RESET} "nome" ["desc"]  Cria um projeto
-    {BOLD}taskflow project list{RESET}                 Lista projetos ativos
-    {BOLD}taskflow project list all{RESET}             Lista todos os projetos (incluindo arquivados)
-    {BOLD}taskflow project show{RESET} <id>            Detalhes do projeto e suas tasks
+    {BOLD}taskflow project add{RESET} "nome" ["desc"]   Cria um projeto
+    {BOLD}taskflow project list{RESET}                  Lista projetos ativos
+    {BOLD}taskflow project list all{RESET}              Inclui projetos arquivados
+    {BOLD}taskflow project show{RESET} <id>             Detalhes do projeto e suas tasks
     {BOLD}taskflow project edit{RESET} <id> name|desc "valor"  Edita o projeto
-    {BOLD}taskflow project archive{RESET} <id>         Arquiva um projeto
-    {BOLD}taskflow assign{RESET} <task_id> <project_id>  Vincula task a um projeto
-    {BOLD}taskflow unassign{RESET} <task_id>           Remove vínculo da task com o projeto
+    {BOLD}taskflow project star{RESET} <id>             Marca como favorito
+    {BOLD}taskflow project unstar{RESET} <id>           Remove favorito
+    {BOLD}taskflow project archive{RESET} <id>          Arquiva um projeto
+    {BOLD}taskflow project rm{RESET} <id>               Remove um projeto
 
-  {CYAN}Agent:{RESET}
-    {BOLD}taskflow agent add{RESET} "título" "action" "YYYY-MM-DD HH:MM"  Agenda task para o agente
-    {BOLD}taskflow agent list{RESET}                   Lista todas as agent tasks
-    {BOLD}taskflow agent cancel{RESET} <id>            Cancela uma agent task pendente
+  {CYAN}Agent tasks:{RESET}
+    {BOLD}taskflow agent{RESET}                         Board do agente
+    {BOLD}taskflow agent add{RESET} "título" "action" "YYYY-MM-DD HH:MM"  Agenda task
+    {BOLD}taskflow agent show{RESET} <id>               Detalhes de uma agent task
+    {BOLD}taskflow agent list{RESET}                    Lista todas as agent tasks
+    {BOLD}taskflow agent cancel{RESET} <id>             Cancela uma agent task pendente
+    {BOLD}taskflow agent rm{RESET} <id>                 Remove uma agent task
 """)
 
 
@@ -127,7 +136,7 @@ def _due_display(due_date_str: str) -> tuple[str, str]:
 
 def cmd_show_all(tasks=None):
     if tasks is None:
-        tasks = get_all_tasks()
+        tasks = get_personal_tasks()
     if not tasks:
         print(f"\n  {GRAY}Nenhuma tarefa encontrada.{RESET}\n")
         return
@@ -194,10 +203,66 @@ def cmd_show_all(tasks=None):
     print()
 
 
+def cmd_agent_show(task_id):
+    task = get_task(task_id)
+    if not task:
+        err(f"Agent task #{task_id} não encontrada.")
+        return
+    if not task["is_agent"]:
+        err(f"Tarefa #{task_id} não é uma agent task. Use: taskflow show {task_id}")
+        return
+
+    STATUS_COLOR = {
+        "pending":   CYAN,
+        "running":   YELLOW,
+        "done":      GREEN,
+        "failed":    RED,
+        "cancelled": GRAY,
+    }
+    STATUS_ICON = {
+        "pending":   "○",
+        "running":   "◉",
+        "done":      "✓",
+        "failed":    "✗",
+        "cancelled": "✗",
+    }
+
+    st    = task["action_status"] or "pending"
+    color = STATUS_COLOR.get(st, GRAY)
+    icon  = STATUS_ICON.get(st, "○")
+    sched = (task["scheduled_at"] or "—")[:16]
+
+    proj_id = task["project_id"]
+    if proj_id:
+        proj = get_project(proj_id)
+        proj_fmt = f"{CYAN}#{proj_id} {proj['name']}{RESET}" if proj else f"{GRAY}#{proj_id}{RESET}"
+    else:
+        proj_fmt = f"{GRAY}—{RESET}"
+
+    result = task["action_result"] or "—"
+
+    print(f"""
+  {BOLD}#{task['id']} — {task['title']}{RESET}  {GRAY}[agent task]{RESET}
+  {GRAY}Status:{RESET}      {color}{icon} {st}{RESET}
+  {GRAY}Agendado:{RESET}    {sched}
+  {GRAY}Projeto:{RESET}     {proj_fmt}
+  {GRAY}Descrição:{RESET}   {task['description'] or '—'}
+  {GRAY}Action:{RESET}
+    {task['action'] or '—'}
+  {GRAY}Resultado:{RESET}
+    {result}
+  {GRAY}Criado em:{RESET}   {task['created_at']}
+  {GRAY}Atualizado:{RESET}  {task['updated_at']}
+""")
+
+
 def cmd_show(task_id):
     task = get_task(task_id)
     if not task:
         err(f"Tarefa #{task_id} não encontrada.")
+        return
+    if task["is_agent"]:
+        err(f"Tarefa #{task_id} é uma agent task. Use: taskflow agent show {task_id}")
         return
 
     status_color = {"backlog": CYAN, "todo": YELLOW, "done": GREEN}
@@ -483,6 +548,13 @@ def main():
             err("Uso: taskflow rm <id>")
             return
         task_id = int(args[1])
+        task = get_task(task_id)
+        if not task:
+            err(f"Tarefa #{task_id} não encontrada.")
+            return
+        if task["is_agent"]:
+            err(f"Tarefa #{task_id} é uma agent task. Use: taskflow agent rm {task_id}")
+            return
         if delete_task(task_id):
             ok(f"Tarefa #{task_id} removida.")
             render_board()
@@ -555,6 +627,12 @@ def main():
             new_id = add_agent_task(title, action, sched)
             ok(f'Agent task #{new_id} "{title}" agendada para {sched}.')
 
+        elif sub == "show":
+            if len(args) < 3:
+                err("Uso: taskflow agent show <id>")
+                return
+            cmd_agent_show(int(args[2]))
+
         elif sub == "list":
             cmd_agent_list()
 
@@ -563,8 +641,32 @@ def main():
                 err("Uso: taskflow agent cancel <id>")
                 return
             task_id = int(args[2])
+            task = get_task(task_id)
+            if not task:
+                err(f"Task #{task_id} não encontrada.")
+                return
+            if not task["is_agent"]:
+                err(f"Tarefa #{task_id} não é uma agent task.")
+                return
             if update_action_status(task_id, "cancelled", "Cancelado manualmente."):
                 ok(f"Agent task #{task_id} cancelada.")
+            else:
+                err(f"Task #{task_id} não encontrada.")
+
+        elif sub == "rm":
+            if len(args) < 3:
+                err("Uso: taskflow agent rm <id>")
+                return
+            task_id = int(args[2])
+            task = get_task(task_id)
+            if not task:
+                err(f"Task #{task_id} não encontrada.")
+                return
+            if not task["is_agent"]:
+                err(f"Tarefa #{task_id} não é uma agent task. Use: taskflow rm {task_id}")
+                return
+            if delete_task(task_id):
+                ok(f"Agent task #{task_id} removida.")
             else:
                 err(f"Task #{task_id} não encontrada.")
 

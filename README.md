@@ -65,16 +65,18 @@ notepad $PROFILE
 ## Uso básico
 
 ```bash
-taskflow                          # Mostra o board kanban
+taskflow                          # Mostra o board kanban pessoal
 taskflow mini                     # Board compacto (só IDs e títulos)
 taskflow add "título da tarefa"   # Adiciona ao backlog
 taskflow todo <id>                # Move para To Do
 taskflow done <id>                # Move para Done
 taskflow back <id>                # Volta ao Backlog
-taskflow show <id>                # Detalhes completos de uma task
-taskflow show all                 # Lista todas as tasks com detalhes
-taskflow rm <id>                  # Remove uma task
+taskflow show <id>                # Detalhes completos de uma task pessoal
+taskflow show all                 # Lista todas as tasks pessoais com detalhes
+taskflow rm <id>                  # Remove uma task pessoal
 ```
+
+> `show all` e `rm` funcionam apenas com tasks pessoais. Para agent tasks, use os subcomandos `taskflow agent show <id>` e `taskflow agent rm <id>`.
 
 ---
 
@@ -166,9 +168,13 @@ Tasks executadas automaticamente pelo Claude Code no horário agendado.
 ```bash
 taskflow agent                    # Board de agente (PENDING/RUNNING/DONE/FAILED/CANCELLED)
 taskflow agent add "título" "action prompt" "YYYY-MM-DD HH:MM"
+taskflow agent show <id>          # Detalhes de uma agent task (action, status, resultado)
 taskflow agent list               # Lista todas as agent tasks
 taskflow agent cancel <id>        # Cancela uma task pendente
+taskflow agent rm <id>            # Remove uma agent task
 ```
+
+> `taskflow show <id>` e `taskflow rm <id>` são exclusivos de tasks pessoais e rejeitam agent tasks com mensagem de erro.
 
 ### Estados do agente
 
