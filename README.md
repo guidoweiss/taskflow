@@ -7,6 +7,7 @@ Gerenciador de tarefas pessoal no terminal com suporte a projetos, relações en
 ## Funcionalidades
 
 - Board kanban no terminal (BACKLOG / TO DO / DONE)
+- **Menu interativo TUI** (`taskflow tui`) — navegação completa com teclado
 - Projetos com marcação de favoritos
 - Relações entre tasks com desbloqueio automático (fila encadeada)
 - Promoção automática para TO DO quando há prazo definido
@@ -59,6 +60,32 @@ notepad $PROFILE
 # Adicionar a linha:
 # function taskflow { python "$env:USERPROFILE\Projetos\taskflow\taskflow.py" @args }
 ```
+
+---
+
+## Menu interativo (TUI)
+
+```bash
+taskflow tui
+```
+
+Abre um menu navegável com teclado. Sem dependências externas — usa `curses` da stdlib do Python.
+
+| Tela | Acesso | O que faz |
+|---|---|---|
+| Menu principal | — | Mostra stats e lista as opções |
+| Tasks pessoais | `k` | Kanban navegável: mover, adicionar, remover tasks |
+| Agent tasks | `a` | Lista com status, resultado e opção de cancelar |
+| Projetos | `p` | Lista projetos; Enter abre detalhes com tasks vinculadas |
+| Filtrar por tag | `f` | Pede uma tag e mostra o kanban filtrado |
+| Buscar tasks | `s` | Pesquisa por título ou descrição |
+| Tasks ocultas | `h` | Lista tasks com `hidden = 1` |
+
+**Atalhos globais:** `↑↓` navegar · `Enter` selecionar · `ESC` voltar ao menu · `q` sair
+
+**Atalhos no kanban:** `←→` mudar coluna · `t/d/b` mover task · `a` adicionar · `x` remover
+
+> **Nota:** `taskflow tui` requer um terminal real (TTY). Não funciona dentro de ambientes sem TTY como pipes ou alguns emuladores de terminal embutidos.
 
 ---
 
@@ -271,6 +298,7 @@ taskflow/
 ├── tasks.py             # Funções de gestão de tasks e projetos
 ├── db.py                # Conexão e migrações do SQLite
 ├── board.py             # Renderização do kanban no terminal
+├── tui.py               # Menu interativo completo (curses)
 ├── taskflow_agent.py    # Daemon de execução de agent tasks
 ├── taskflow.db          # Banco de dados SQLite (gerado automaticamente)
 └── agent.log            # Log de execuções do agente (gerado automaticamente)
