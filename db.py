@@ -45,11 +45,56 @@ def init_db():
         "ALTER TABLE tasks ADD COLUMN priority TEXT    DEFAULT ''",
         "ALTER TABLE tasks ADD COLUMN due_date TEXT    DEFAULT ''",
         "ALTER TABLE tasks ADD COLUMN hidden   INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE tasks ADD COLUMN link     TEXT    DEFAULT ''",
+        "ALTER TABLE tasks ADD COLUMN plan     TEXT    DEFAULT ''",
     ]:
         try:
             cursor.execute(migration)
         except Exception:
             pass  # coluna já existe, tudo certo
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS projects (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            name        TEXT    NOT NULL,
+            description TEXT    DEFAULT '',
+            status      TEXT    NOT NULL DEFAULT 'active'
+                            CHECK(status IN ('active', 'archived')),
+            created_at  TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+            updated_at  TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
+        )
+    """)
+
+    try:
+        cursor.execute("ALTER TABLE tasks ADD COLUMN project_id INTEGER DEFAULT NULL")
+    except Exception:
+        pass  # coluna já existe
+
+    try:
+        cursor.execute("ALTER TABLE projects ADD COLUMN starred INTEGER NOT NULL DEFAULT 0")
+    except Exception:
+        pass  # coluna já existe
+
+    for migration in [
+        "ALTER TABLE tasks ADD COLUMN scheduled_at   TEXT DEFAULT NULL",
+        "ALTER TABLE tasks ADD COLUMN action         TEXT DEFAULT NULL",
+        "ALTER TABLE tasks ADD COLUMN action_status  TEXT DEFAULT NULL",
+        "ALTER TABLE tasks ADD COLUMN action_result  TEXT DEFAULT NULL",
+        "ALTER TABLE tasks ADD COLUMN recurrence     TEXT DEFAULT NULL",
+    ]:
+        try:
+            cursor.execute(migration)
+        except Exception:
+            pass  # coluna já existe
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS task_relations (
+            from_task_id INTEGER NOT NULL,
+            to_task_id   INTEGER NOT NULL,
+            type         TEXT    NOT NULL DEFAULT 'continues',
+            PRIMARY KEY (from_task_id, to_task_id)
+        )
+    """)
 
     conn.commit()
     conn.close()
