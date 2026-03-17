@@ -219,6 +219,36 @@ CLAUDE_BIN = "/home/user/.local/bin/claude"  # Linux/macOS
 # CLAUDE_BIN = "claude"                       # Windows (se estiver no PATH)
 ```
 
+### Como o agente executa uma task
+
+O agente não envia apenas o prompt cru ao Claude. Ele constrói um **prompt enriquecido** com contexto da task e instrui o Claude a terminar sempre com um marcador estruturado:
+
+```
+---TASKFLOW_RESULT---
+STATUS: done
+SUMMARY: resume do que foi feito
+```
+
+ou, em caso de falha:
+
+```
+---TASKFLOW_RESULT---
+STATUS: failed
+SUMMARY: o que tentou e por que falhou
+```
+
+O agente lê este marcador para determinar o status real — não o exit code do processo. O `SUMMARY` é guardado em `action_result` e visível em `taskflow agent list`.
+
+### Estados e transições
+
+```
+PENDING → RUNNING → DONE      (Claude reportou STATUS: done)
+                  → FAILED    (qualquer falha: lógica, técnica, timeout, formato inválido)
+         (manual) → CANCELLED
+```
+
+Tasks em `FAILED` ficam paradas. Não há retry automático — o utilizador decide o que fazer.
+
 ### Limites do agente
 
 - Máximo **5 tasks por dia** (configurável em `taskflow_agent.py` via `MAX_PER_DAY`)
