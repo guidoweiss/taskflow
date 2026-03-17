@@ -3,6 +3,7 @@ taskflow/board.py
 Renderiza o board kanban no terminal com cores ANSI.
 """
 
+import re
 from datetime import date, datetime
 from tasks import get_tasks_by_status
 
@@ -21,39 +22,39 @@ YELLOW  = "\033[93m"
 GREEN   = "\033[92m"
 RED     = "\033[91m"
 
-COL_WIDTH  = 30
-CELL_WIDTH = COL_WIDTH + 4
+COL_WIDTH = 30
+INNER     = COL_WIDTH + 2
 
-PRIORITY_BADGE = {
-    "alta":  f"\033[91m!\033[0m",   # vermelho
-    "media": f"\033[93m~\033[0m",   # amarelo
-    "baixa": "",
-    "":      "",
-}
+ANSI_RE = re.compile(r'\033\[[0-9;]*m')
+
+PRIORITY_COLOR = {"alta": RED, "media": YELLOW, "baixa": GRAY}
+
+
+def strip_ansi(s: str) -> str:
+    return ANSI_RE.sub('', s)
 
 
 def pad(text: str, width: int) -> str:
-    if len(text) > width:
-        return text[:width - 1] + "…"
-    return text.ljust(width)
+    vlen = len(strip_ansi(text))
+    if vlen > width:
+        return strip_ansi(text)[:width - 1] + "…"
+    return text + " " * (width - vlen)
 
 
-def _due_label(due_date_str: str) -> tuple[str, str]:
-    """Retorna (texto, cor_ansi) para exibir o prazo."""
+def _due_display_short(due_date_str: str) -> tuple[str, str]:
     if not due_date_str or not due_date_str.strip():
         return "", ""
     try:
-        due = datetime.strptime(due_date_str.strip(), "%Y-%m-%d").date()
+        due  = datetime.strptime(due_date_str.strip(), "%Y-%m-%d").date()
+        diff = (due - date.today()).days
+        if diff < 0:
+            return f"{due_date_str} !!", RED
+        elif diff <= 2:
+            return f"{due_date_str}", YELLOW
+        else:
+            return f"{due_date_str}", GRAY
     except ValueError:
         return due_date_str, GRAY
-    today = date.today()
-    diff = (due - today).days
-    if diff < 0:
-        return f"prazo: {due_date_str} !!", RED
-    elif diff <= 2:
-        return f"prazo: {due_date_str}", YELLOW
-    else:
-        return f"prazo: {due_date_str}", GRAY
 
 
 def render_board(tag_filter: str = ""):
@@ -64,48 +65,76 @@ def render_board(tag_filter: str = ""):
     total    = len(backlog) + len(todo) + len(done)
     max_rows = max(len(backlog), len(todo), len(done), 1)
 
-    seg      = "─" * (COL_WIDTH + 2)
+    seg      = "─" * INNER
     line_top = f"┌{seg}┬{seg}┬{seg}┐"
     line_sep = f"├{seg}┼{seg}┼{seg}┤"
     line_bot = f"└{seg}┴{seg}┴{seg}┘"
 
     def col_header(label, bg, fg, count):
-        text   = f" {label} ({count})"
-        padded = pad(text, COL_WIDTH + 2)
-        return f"│{bg}{fg}{BOLD}{padded}{RESET}"
+        return f"│{bg}{fg}{BOLD}{pad(f' {label} ({count})', INNER)}{RESET}"
 
-    inner_width = COL_WIDTH + 2
-
-    def task_title_line(tasks, index, color):
+    # linha 1 — título
+    def title_line(tasks, index, color):
         if index < len(tasks):
-            t     = tasks[index]
-            badge = PRIORITY_BADGE.get(t["priority"] or "", "")
-            badge_plain = f"[{t['priority']}] " if t["priority"] in ("alta", "media") else ""
-            prefix = f" {badge}{badge_plain}" if badge else " "
-            text  = f"{prefix}#{t['id']} {t['title']}"
-            return f"│{color}{pad(text, inner_width)}{RESET}"
-        return f"│{' ' * inner_width}"
+            t    = tasks[index]
+            text = f" #{t['id']} {t['title']}"
+            return f"│{color}{pad(text, INNER)}{RESET}"
+        return f"│{' ' * INNER}"
 
-    def task_tags_line(tasks, index):
+    # linha 2 — tag · prioridade
+    def tag_priority_line(tasks, index):
         if index < len(tasks):
-            t   = tasks[index]
-            raw = (t["tags"] or "").strip()
-            parts = []
-            if raw:
-                parts += [f"[{tag.strip()}]" for tag in raw.split(",") if tag.strip()]
-            due_text, due_color = _due_label(t["due_date"] or "")
-            if due_text:
-                parts.append(f"[{due_text}]")
-                # colorir o prazo separadamente — simplificado: só color no texto todo
-                text = f"  {' '.join(parts)}"
-                # apply due color to last bracket
-                tags_part = " ".join(parts[:-1])
-                due_part  = parts[-1]
-                combined  = f"  {GRAY}{tags_part}{RESET} {due_color}{due_part}{RESET}" if tags_part else f"  {due_color}{due_part}{RESET}"
-                return f"│{pad(combined, inner_width + len(GRAY) + len(RESET) + len(due_color) + len(RESET))}{RESET}"
-            text = f"  {' '.join(parts)}"
-            return f"│{GRAY}{pad(text, inner_width)}{RESET}"
-        return f"│{' ' * inner_width}"
+            t        = tasks[index]
+            raw      = (t["tags"] or "").strip()
+            tag      = raw.split(",")[0].strip() if raw else ""
+            priority = (t["priority"] or "").strip()
+
+            parts_plain   = []
+            parts_colored = []
+
+            if tag:
+                parts_plain.append(f"[{tag}]")
+                parts_colored.append(f"{GRAY}[{tag}]{RESET}")
+
+            if priority:
+                pc = PRIORITY_COLOR.get(priority, GRAY)
+                parts_plain.append(priority)
+                parts_colored.append(f"{pc}{priority}{RESET}")
+
+            if not parts_plain:
+                return f"│{' ' * INNER}"
+
+            sep_plain   = "  ·  "
+            sep_colored = f"  {GRAY}·{RESET}  "
+            plain       = "  " + sep_plain.join(parts_plain)
+            colored     = "  " + sep_colored.join(parts_colored)
+            vlen        = len(plain)
+
+            if vlen > INNER:
+                return f"│{GRAY}{plain[:INNER - 1]}…{RESET}"
+            return f"│{colored}{' ' * (INNER - vlen)}"
+        return f"│{' ' * INNER}"
+
+    # linha 3 — criado · vence (só mostra vence se existir)
+    def dates_line(tasks, index):
+        if index < len(tasks):
+            t       = tasks[index]
+            created = (t["created_at"] or "")[:10]  # só a data, sem hora
+            due_str = (t["due_date"] or "").strip()
+
+            plain   = f"  C {created}"
+            colored = f"  {GRAY}C {created}{RESET}"
+
+            if due_str:
+                due_text, due_color = _due_display_short(due_str)
+                plain   += f"  ·  V {due_text}"
+                colored += f"  {GRAY}·{RESET}  {due_color}V {due_text}{RESET}"
+
+            vlen = len(plain)
+            if vlen > INNER:
+                return f"│{GRAY}{plain[:INNER - 1]}…{RESET}"
+            return f"│{colored}{' ' * (INNER - vlen)}"
+        return f"│{' ' * INNER}"
 
     filter_label = f"  {GRAY}filtro: [{tag_filter}]{RESET}" if tag_filter else ""
     print()
@@ -120,14 +149,9 @@ def render_board(tag_filter: str = ""):
     print(f"  {line_sep}")
 
     for i in range(max_rows):
-        b = task_title_line(backlog, i, CYAN)
-        t = task_title_line(todo,    i, YELLOW)
-        d = task_title_line(done,    i, GREEN)
-        print(f"  {b}{t}{d}│")
-        b = task_tags_line(backlog, i)
-        t = task_tags_line(todo,    i)
-        d = task_tags_line(done,    i)
-        print(f"  {b}{t}{d}│")
+        print(f"  {title_line(backlog, i, CYAN)}{title_line(todo, i, YELLOW)}{title_line(done, i, GREEN)}│")
+        print(f"  {tag_priority_line(backlog, i)}{tag_priority_line(todo, i)}{tag_priority_line(done, i)}│")
+        print(f"  {dates_line(backlog, i)}{dates_line(todo, i)}{dates_line(done, i)}│")
 
     print(f"  {line_bot}")
     print()

@@ -23,7 +23,8 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from db import init_db
 from tasks import (add_task, move_task, delete_task, get_task, tag_task,
-                   get_all_tasks, search_tasks, edit_task, VALID_PRIORITIES)
+                   get_all_tasks, search_tasks, edit_task, set_hidden,
+                   auto_hide_stale, get_hidden_tasks, VALID_PRIORITIES)
 from board import render_board
 
 from datetime import date, datetime
@@ -72,6 +73,9 @@ def help_text():
     {BOLD}taskflow rm{RESET} <id>                      Remove tarefa
     {BOLD}taskflow show{RESET} <id>                    Detalhes de uma tarefa
     {BOLD}taskflow show all{RESET}                     Lista todas as tarefas com detalhes
+    {BOLD}taskflow hidden{RESET}                       Lista tarefas ocultas
+    {BOLD}taskflow hide{RESET} <id>                    Oculta uma tarefa manualmente
+    {BOLD}taskflow unhide{RESET} <id>                  Traz uma tarefa oculta de volta ao backlog
 """)
 
 
@@ -172,8 +176,25 @@ def cmd_search(query):
     cmd_show_all(results)
 
 
+def cmd_hidden():
+    tasks = get_hidden_tasks()
+    if not tasks:
+        print(f"\n  {GRAY}Nenhuma tarefa oculta.{RESET}\n")
+        return
+    print(f"\n  {BOLD}Tarefas ocultas{RESET}{GRAY} — {len(tasks)} tarefa(s){RESET}\n")
+    SEP = f"  {GRAY}{'─' * 60}{RESET}"
+    for task in tasks:
+        tags_raw = task["tags"] or ""
+        tag_fmt  = f"{GRAY}[{tags_raw.split(',')[0].strip()}]{RESET}" if tags_raw else f"{GRAY}—{RESET}"
+        print(f"  {GRAY}#{task['id']} {task['title']}{RESET}")
+        print(f"  {GRAY}Tag:{RESET} {tag_fmt}    {GRAY}Oculta desde:{RESET} {GRAY}{(task['updated_at'] or '')[:10]}{RESET}")
+        print(SEP)
+    print()
+
+
 def main():
     init_db()
+    hidden_count = auto_hide_stale(days=14)
     args = sys.argv[1:]
 
     if not args:
@@ -210,12 +231,12 @@ def main():
 
     elif cmd == "tag":
         if len(args) < 3:
-            err('Uso: taskflow tag <id> "tag1,tag2,tag3"')
+            err('Uso: taskflow tag <id> "tag"')
             return
         task_id = int(args[1])
-        tags    = args[2]
-        if tag_task(task_id, tags):
-            ok(f"Tags da tarefa #{task_id} atualizadas: {tags}")
+        success, used_tag = tag_task(task_id, args[2])
+        if success:
+            ok(f'Tag da tarefa #{task_id} definida como "{used_tag}".')
             render_board()
         else:
             err(f"Tarefa #{task_id} não encontrada.")
@@ -265,6 +286,31 @@ def main():
             err('Uso: taskflow search "termo"')
             return
         cmd_search(args[1])
+
+    elif cmd == "hidden":
+        cmd_hidden()
+
+    elif cmd == "hide":
+        if len(args) < 2:
+            err("Uso: taskflow hide <id>")
+            return
+        task_id = int(args[1])
+        if set_hidden(task_id, True):
+            ok(f"Tarefa #{task_id} ocultada.")
+            render_board()
+        else:
+            err(f"Tarefa #{task_id} não encontrada.")
+
+    elif cmd == "unhide":
+        if len(args) < 2:
+            err("Uso: taskflow unhide <id>")
+            return
+        task_id = int(args[1])
+        if set_hidden(task_id, False):
+            ok(f"Tarefa #{task_id} visível novamente.")
+            render_board()
+        else:
+            err(f"Tarefa #{task_id} não encontrada.")
 
     elif cmd == "rm":
         if len(args) < 2:

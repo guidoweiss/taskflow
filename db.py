@@ -41,9 +41,10 @@ def init_db():
 
     # Migrações: adiciona colunas se o banco já existia sem elas
     for migration in [
-        "ALTER TABLE tasks ADD COLUMN tags     TEXT DEFAULT ''",
-        "ALTER TABLE tasks ADD COLUMN priority TEXT DEFAULT ''",
-        "ALTER TABLE tasks ADD COLUMN due_date TEXT DEFAULT ''",
+        "ALTER TABLE tasks ADD COLUMN tags     TEXT    DEFAULT ''",
+        "ALTER TABLE tasks ADD COLUMN priority TEXT    DEFAULT ''",
+        "ALTER TABLE tasks ADD COLUMN due_date TEXT    DEFAULT ''",
+        "ALTER TABLE tasks ADD COLUMN hidden   INTEGER NOT NULL DEFAULT 0",
     ]:
         try:
             cursor.execute(migration)
