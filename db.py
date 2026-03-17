@@ -39,11 +39,16 @@ def init_db():
         )
     """)
 
-    # Migração: adiciona a coluna tags se o banco já existia sem ela
-    try:
-        cursor.execute("ALTER TABLE tasks ADD COLUMN tags TEXT DEFAULT ''")
-    except Exception:
-        pass  # coluna já existe, tudo certo
+    # Migrações: adiciona colunas se o banco já existia sem elas
+    for migration in [
+        "ALTER TABLE tasks ADD COLUMN tags     TEXT DEFAULT ''",
+        "ALTER TABLE tasks ADD COLUMN priority TEXT DEFAULT ''",
+        "ALTER TABLE tasks ADD COLUMN due_date TEXT DEFAULT ''",
+    ]:
+        try:
+            cursor.execute(migration)
+        except Exception:
+            pass  # coluna já existe, tudo certo
 
     conn.commit()
     conn.close()
