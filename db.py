@@ -81,6 +81,7 @@ def init_db():
         "ALTER TABLE tasks ADD COLUMN action_status  TEXT DEFAULT NULL",
         "ALTER TABLE tasks ADD COLUMN action_result  TEXT DEFAULT NULL",
         "ALTER TABLE tasks ADD COLUMN recurrence     TEXT DEFAULT NULL",
+        "ALTER TABLE tasks ADD COLUMN is_agent       INTEGER NOT NULL DEFAULT 0",
     ]:
         try:
             cursor.execute(migration)

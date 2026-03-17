@@ -7,7 +7,7 @@ from db import get_connection, init_db
 
 VALID_PRIORITIES = ("alta", "media", "baixa", "")
 
-COLS = "id, title, description, tags, status, priority, due_date, hidden, link, plan, project_id, scheduled_at, action, action_status, action_result, recurrence, created_at, updated_at"
+COLS = "id, title, description, tags, status, priority, due_date, hidden, link, plan, project_id, scheduled_at, action, action_status, action_result, recurrence, is_agent, created_at, updated_at"
 
 
 def add_task(title: str, description: str = "", status: str = "backlog",
@@ -166,7 +166,7 @@ def get_tasks_by_status(status: str, tag_filter: str = "") -> list:
     cursor = conn.cursor()
 
     blocked_filter = """
-        AND (action IS NULL OR action = '')
+        AND is_agent = 0
         AND NOT EXISTS (
             SELECT 1 FROM task_relations r
             JOIN tasks origin ON origin.id = r.from_task_id
@@ -201,7 +201,7 @@ def get_agent_tasks_by_status(action_status: str) -> list:
     cursor = conn.cursor()
     cursor.execute(f"""
         SELECT {COLS} FROM tasks
-        WHERE action IS NOT NULL AND action != ''
+        WHERE is_agent = 1
           AND (action_status = ? OR (action_status IS NULL AND ? = 'pending'))
           AND hidden = 0
         ORDER BY scheduled_at ASC
@@ -455,8 +455,8 @@ def add_agent_task(title: str, action: str, scheduled_at: str,
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO tasks (title, description, project_id, status, action, scheduled_at, action_status)
-        VALUES (?, ?, ?, 'backlog', ?, ?, 'pending')
+        INSERT INTO tasks (title, description, project_id, status, action, scheduled_at, action_status, is_agent)
+        VALUES (?, ?, ?, 'backlog', ?, ?, 'pending', 1)
     """, (title, description, project_id, action, scheduled_at))
     new_id = cursor.lastrowid
     conn.commit()
@@ -465,13 +465,12 @@ def add_agent_task(title: str, action: str, scheduled_at: str,
 
 
 def get_due_agent_tasks() -> list:
-    """Tasks com action agendada para agora ou passado, ainda pendentes."""
+    """Agent tasks vencidas e ainda pendentes."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(f"""
         SELECT {COLS} FROM tasks
-        WHERE action IS NOT NULL
-          AND action != ''
+        WHERE is_agent = 1
           AND action_status = 'pending'
           AND scheduled_at <= datetime('now', 'localtime')
           AND hidden = 0
@@ -483,12 +482,12 @@ def get_due_agent_tasks() -> list:
 
 
 def get_agent_tasks() -> list:
-    """Todas as tasks com action (para listagem)."""
+    """Todas as agent tasks (para listagem)."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(f"""
         SELECT {COLS} FROM tasks
-        WHERE action IS NOT NULL AND action != ''
+        WHERE is_agent = 1
         ORDER BY scheduled_at ASC
     """)
     rows = cursor.fetchall()

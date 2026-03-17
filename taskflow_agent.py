@@ -94,7 +94,7 @@ def run_task(task) -> tuple[str, str]:
 
     try:
         result = subprocess.run(
-            [CLAUDE_BIN, "-p", prompt],
+            [CLAUDE_BIN, "-p", prompt, "--dangerously-skip-permissions"],
             capture_output=True,
             text=True,
             timeout=TASK_TIMEOUT,
