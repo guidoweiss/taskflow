@@ -31,6 +31,7 @@ from tasks import (add_task, move_task, delete_task, get_task, tag_task,
                    delete_project, star_project,
                    add_agent_task, get_agent_tasks, update_action_status)
 from board import render_board, render_mini, render_agent_board
+from tui import run_tui
 
 from datetime import date, datetime
 
@@ -64,6 +65,7 @@ def help_text():
 
   {CYAN}Board:{RESET}
     {BOLD}taskflow{RESET}                               Board kanban pessoal
+    {BOLD}taskflow tui{RESET}                           Menu interativo (navegar com ←→↑↓)
     {BOLD}taskflow mini{RESET}                          Board compacto
     {BOLD}taskflow filter{RESET} <tag>                  Filtra board por tag
     {BOLD}taskflow search{RESET} "termo"                Busca em títulos e descrições
@@ -432,6 +434,10 @@ def main():
 
     if cmd in ("help", "--help", "-h"):
         help_text()
+
+    elif cmd == "tui":
+        import curses
+        curses.wrapper(run_tui)
 
     elif cmd == "add":
         if len(args) < 2:
