@@ -6,8 +6,9 @@ Responsável por criar e gerenciar a conexão com o banco de dados SQLite.
 import sqlite3
 from pathlib import Path
 
-# Caminho do arquivo do banco de dados
-DB_PATH = Path(__file__).parent / "taskflow.db"
+# Banco de dados fora do repo (dados de runtime, não versionados)
+DB_PATH = Path.home() / ".local" / "share" / "taskflow" / "taskflow.db"
+DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
 def get_connection():

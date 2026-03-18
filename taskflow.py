@@ -26,7 +26,7 @@ from tasks import (add_task, move_task, delete_task, get_task, tag_task,
                    get_all_tasks, get_personal_tasks, search_tasks, edit_task, set_hidden,
                    auto_hide_stale, auto_promote_due, get_hidden_tasks, VALID_PRIORITIES,
                    add_relation, remove_relation, get_relations,
-                   add_project, get_project, get_all_projects, archive_project,
+                   add_project, get_project, get_project_by_name, get_all_projects, archive_project,
                    edit_project, assign_task, unassign_task, get_tasks_by_project,
                    delete_project, star_project,
                    add_agent_task, get_agent_tasks, update_action_status)
@@ -71,7 +71,14 @@ def help_text():
     {BOLD}taskflow search{RESET} "termo"                Busca em títulos e descrições
 
   {CYAN}Tasks pessoais:{RESET}
-    {BOLD}taskflow add{RESET} "título" ["desc"]         Adiciona tarefa ao backlog
+    {BOLD}taskflow add{RESET} "título" [flags]          Adiciona tarefa ao backlog
+      {GRAY}--desc "..."        Descrição
+      --tag "tag"         Tag da tarefa
+      --project id|nome   Vincula a um projeto (aceita ID ou nome)
+      --link "..."        Link de apoio
+      --plan "..."        Plano de execução
+      --priority alta|media|baixa
+      --due YYYY-MM-DD    Prazo{RESET}
     {BOLD}taskflow todo{RESET} <id>                     Move para To Do
     {BOLD}taskflow done{RESET} <id>                     Move para Done
     {BOLD}taskflow back{RESET} <id>                     Move de volta para Backlog
@@ -81,7 +88,7 @@ def help_text():
     {BOLD}taskflow hide{RESET} <id>                     Oculta uma tarefa
     {BOLD}taskflow unhide{RESET} <id>                   Traz tarefa oculta de volta ao backlog
     {BOLD}taskflow hidden{RESET}                        Lista tarefas ocultas
-    {BOLD}taskflow tag{RESET} <id> "tag"                Define tag da tarefa
+    {BOLD}taskflow tag{RESET} <id> "tag"                Redefine tag da tarefa
     {BOLD}taskflow edit{RESET} <id> title "valor"       Edita o título
     {BOLD}taskflow edit{RESET} <id> desc "valor"        Edita a descrição
     {BOLD}taskflow edit{RESET} <id> priority alta|media|baixa  Define prioridade
@@ -109,7 +116,10 @@ def help_text():
 
   {CYAN}Agent tasks:{RESET}
     {BOLD}taskflow agent{RESET}                         Board do agente
-    {BOLD}taskflow agent add{RESET} "título" "action" "YYYY-MM-DD HH:MM"  Agenda task
+    {BOLD}taskflow agent add{RESET} "título" "action" "YYYY-MM-DD HH:MM" [flags]  Agenda task
+      {GRAY}--desc "..."        Descrição
+      --tag "tag"         Tag da task
+      --project id|nome   Vincula a um projeto{RESET}
     {BOLD}taskflow agent show{RESET} <id>               Detalhes de uma agent task
     {BOLD}taskflow agent list{RESET}                    Lista todas as agent tasks
     {BOLD}taskflow agent cancel{RESET} <id>             Cancela uma agent task pendente
@@ -420,6 +430,40 @@ def cmd_hidden():
     print()
 
 
+def _parse_flags(args):
+    """Extrai --flag valor de uma lista de args. Retorna dict com os pares encontrados."""
+    flags = {}
+    i = 0
+    while i < len(args):
+        if args[i].startswith("--"):
+            key = args[i][2:]
+            if i + 1 < len(args) and not args[i + 1].startswith("--"):
+                flags[key] = args[i + 1]
+                i += 2
+            else:
+                flags[key] = True
+                i += 1
+        else:
+            i += 1
+    return flags
+
+
+def _resolve_project(value):
+    """Resolve project_id a partir de um número (ID) ou nome do projeto."""
+    try:
+        pid = int(value)
+        if get_project(pid):
+            return pid
+        err(f"Projeto #{pid} não encontrado.")
+        return None
+    except ValueError:
+        proj = get_project_by_name(value)
+        if proj:
+            return proj["id"]
+        err(f'Projeto "{value}" não encontrado.')
+        return None
+
+
 def main():
     init_db()
     auto_promote_due()
@@ -441,11 +485,36 @@ def main():
 
     elif cmd == "add":
         if len(args) < 2:
-            err('Uso: taskflow add "título da tarefa" ["descrição"]')
+            err('Uso: taskflow add "título" [--desc "..."] [--tag "tag"] [--project id|nome] [--link "..."] [--plan "..."] [--priority alta|media|baixa] [--due YYYY-MM-DD]')
             return
         title = args[1]
-        desc  = args[2] if len(args) > 2 else ""
-        new_id = add_task(title, desc)
+        flags = _parse_flags(args[2:])
+
+        desc     = flags.get("desc", "")
+        tag      = flags.get("tag", "")
+        link     = flags.get("link", "")
+        plan     = flags.get("plan", "")
+        priority = flags.get("priority", "")
+        due      = flags.get("due", "")
+
+        if priority and priority not in VALID_PRIORITIES:
+            err(f'Prioridade inválida: "{priority}". Use: alta, media, baixa')
+            return
+        if due:
+            try:
+                datetime.strptime(due, "%Y-%m-%d")
+            except ValueError:
+                err('Formato de data inválido. Use: YYYY-MM-DD (ex: 2026-03-25)')
+                return
+
+        project_id = None
+        if "project" in flags:
+            project_id = _resolve_project(flags["project"])
+            if project_id is None:
+                return
+
+        new_id = add_task(title, desc, tags=tag, priority=priority,
+                          due_date=due, link=link, plan=plan, project_id=project_id)
         ok(f'Tarefa #{new_id} "{title}" adicionada ao backlog.')
         render_board()
 
@@ -620,17 +689,29 @@ def main():
 
         if sub == "add":
             if len(args) < 5:
-                err('Uso: taskflow agent add "título" "action" "YYYY-MM-DD HH:MM"')
+                err('Uso: taskflow agent add "título" "action" "YYYY-MM-DD HH:MM" [--desc "..."] [--tag "tag"] [--project id|nome]')
                 return
-            title      = args[2]
-            action     = args[3]
-            sched      = args[4]
+            title  = args[2]
+            action = args[3]
+            sched  = args[4]
             try:
                 datetime.strptime(sched, "%Y-%m-%d %H:%M")
             except ValueError:
                 err('Formato de data inválido. Use: YYYY-MM-DD HH:MM')
                 return
-            new_id = add_agent_task(title, action, sched)
+
+            flags = _parse_flags(args[5:])
+            desc  = flags.get("desc", "")
+            tag   = flags.get("tag", "")
+
+            project_id = None
+            if "project" in flags:
+                project_id = _resolve_project(flags["project"])
+                if project_id is None:
+                    return
+
+            new_id = add_agent_task(title, action, sched, description=desc,
+                                    project_id=project_id, tags=tag)
             ok(f'Agent task #{new_id} "{title}" agendada para {sched}.')
 
         elif sub == "show":

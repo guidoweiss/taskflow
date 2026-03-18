@@ -1,6 +1,6 @@
 # taskflow
 
-Gerenciador de tarefas pessoal no terminal com suporte a projetos, relações entre tasks, agendamento e execução autónoma via Claude Code.
+Gerenciador de tarefas pessoal no terminal com suporte a projetos, relações entre tasks, agendamento e execução autônoma via Claude Code.
 
 ---
 
@@ -13,6 +13,7 @@ Gerenciador de tarefas pessoal no terminal com suporte a projetos, relações en
 - Promoção automática para TO DO quando há prazo definido
 - Board compacto (`mini`)
 - **Agent tasks** — tasks agendadas executadas automaticamente pelo Claude Code
+- **Skill para Claude Code** — o Claude usa o taskflow automaticamente ao conversar
 
 ---
 
@@ -22,7 +23,7 @@ Gerenciador de tarefas pessoal no terminal com suporte a projetos, relações en
 |---|---|
 | Python | 3.10+ |
 | SQLite | incluído no Python |
-| Claude Code CLI | qualquer versão recente |
+| Claude Code CLI | qualquer versão recente (opcional, para a skill) |
 
 ---
 
@@ -31,61 +32,60 @@ Gerenciador de tarefas pessoal no terminal com suporte a projetos, relações en
 ### Linux / macOS
 
 ```bash
-# 1. Clonar o repositório
-git clone https://github.com/guidoweiss/taskflow.git ~/Projetos/.pessoal/taskflow
-cd ~/Projetos/.pessoal/taskflow
+# 1. Clonar em ~/.claude/skills/taskflow (recomendado — ativa a skill automaticamente)
+git clone https://github.com/guidoweiss/taskflow.git ~/.claude/skills/taskflow
 
-# 2. Inicializar o banco de dados
-python3 taskflow.py
+# 2. Inicializar o banco de dados (criado em ~/.local/share/taskflow/taskflow.db)
+python3 ~/.claude/skills/taskflow/taskflow.py
 
-# 3. Adicionar alias no shell (bash ou zsh)
-echo 'alias taskflow="python3 ~/Projetos/.pessoal/taskflow/taskflow.py"' >> ~/.bashrc
+# 3. Criar executável global
+echo '#!/bin/bash' > ~/.local/bin/taskflow
+echo 'python3 ~/.claude/skills/taskflow/taskflow.py "$@"' >> ~/.local/bin/taskflow
+chmod +x ~/.local/bin/taskflow
+
+# Ou adicionar alias no shell
+echo 'alias taskflow="python3 ~/.claude/skills/taskflow/taskflow.py"' >> ~/.bashrc
 source ~/.bashrc
-# Para zsh:
-# echo 'alias taskflow="python3 ~/Projetos/.pessoal/taskflow/taskflow.py"' >> ~/.zshrc
 ```
+
+> **Nota:** O banco de dados fica em `~/.local/share/taskflow/taskflow.db` — fora do repositório e não versionado.
 
 ### Windows
 
 ```powershell
 # 1. Clonar o repositório
-git clone https://github.com/guidoweiss/taskflow.git "$env:USERPROFILE\Projetos\taskflow"
-cd "$env:USERPROFILE\Projetos\taskflow"
+git clone https://github.com/guidoweiss/taskflow.git "$env:USERPROFILE\.claude\skills\taskflow"
 
 # 2. Inicializar o banco de dados
-python taskflow.py
+python "$env:USERPROFILE\.claude\skills\taskflow\taskflow.py"
 
 # 3. Adicionar alias permanente (PowerShell profile)
 notepad $PROFILE
 # Adicionar a linha:
-# function taskflow { python "$env:USERPROFILE\Projetos\taskflow\taskflow.py" @args }
+# function taskflow { python "$env:USERPROFILE\.claude\skills\taskflow\taskflow.py" @args }
 ```
 
 ---
 
-## Menu interativo (TUI)
+## Integração com Claude Code
+
+O taskflow inclui um arquivo `SKILL.md` que instrui o Claude Code a usar o taskflow automaticamente sempre que o usuário mencionar tarefas, backlog, prioridades, lembretes, etc.
+
+Clonando em `~/.claude/skills/taskflow/`, a skill é carregada automaticamente — nenhuma configuração extra é necessária.
+
+Se clonou em outro diretório, mova para o caminho correto:
 
 ```bash
-taskflow tui
+mv /caminho/do/clone ~/.claude/skills/taskflow
 ```
 
-Abre um menu navegável com teclado. Sem dependências externas — usa `curses` da stdlib do Python.
+Com a skill ativa, você pode dizer ao Claude coisas como:
 
-| Tela | Acesso | O que faz |
-|---|---|---|
-| Menu principal | — | Mostra stats e lista as opções |
-| Tasks pessoais | `k` | Kanban navegável: mover, adicionar, remover tasks |
-| Agent tasks | `a` | Lista com status, resultado e opção de cancelar |
-| Projetos | `p` | Lista projetos; Enter abre detalhes com tasks vinculadas |
-| Filtrar por tag | `f` | Pede uma tag e mostra o kanban filtrado |
-| Buscar tasks | `s` | Pesquisa por título ou descrição |
-| Tasks ocultas | `h` | Lista tasks com `hidden = 1` |
+- *"Cria uma task para implementar autenticação no Driagenda com prazo sexta"*
+- *"Move a #12 para done"*
+- *"Mostra o backlog"*
 
-**Atalhos globais:** `↑↓` navegar · `Enter` selecionar · `ESC` voltar ao menu · `q` sair
-
-**Atalhos no kanban:** `←→` mudar coluna · `t/d/b` mover task · `a` adicionar · `x` remover
-
-> **Nota:** `taskflow tui` requer um terminal real (TTY). Não funciona dentro de ambientes sem TTY como pipes ou alguns emuladores de terminal embutidos.
+E o Claude opera o taskflow diretamente, sem precisar de comandos manuais.
 
 ---
 
@@ -98,12 +98,38 @@ taskflow add "título da tarefa"   # Adiciona ao backlog
 taskflow todo <id>                # Move para To Do
 taskflow done <id>                # Move para Done
 taskflow back <id>                # Volta ao Backlog
-taskflow show <id>                # Detalhes completos de uma task pessoal
-taskflow show all                 # Lista todas as tasks pessoais com detalhes
-taskflow rm <id>                  # Remove uma task pessoal
+taskflow show <id>                # Detalhes completos de uma task
+taskflow show all                 # Lista todas as tasks com detalhes
+taskflow rm <id>                  # Remove uma task
 ```
 
-> `show all` e `rm` funcionam apenas com tasks pessoais. Para agent tasks, use os subcomandos `taskflow agent show <id>` e `taskflow agent rm <id>`.
+---
+
+## Criação completa em um comando
+
+O `add` aceita flags opcionais para preencher todos os campos na criação:
+
+```bash
+taskflow add "título" \
+  --desc "descrição da task" \
+  --tag "NomeDoProjeto" \
+  --project "NomeDoProjeto" \   # aceita ID numérico ou nome
+  --link "/caminho/ou/url" \
+  --plan "1. Passo um\n2. Passo dois" \
+  --priority alta \             # alta | media | baixa
+  --due 2026-04-01              # YYYY-MM-DD
+```
+
+Exemplo real:
+
+```bash
+taskflow add "Implementar autenticação JWT" \
+  --desc "Criar rota /auth com geração e validação de tokens JWT" \
+  --tag "Driagenda" \
+  --project Driagenda \
+  --priority alta \
+  --due 2026-03-28
+```
 
 ---
 
@@ -117,7 +143,7 @@ taskflow edit <id> due 2026-04-01       # Define prazo (YYYY-MM-DD)
 taskflow edit <id> due clear            # Remove prazo
 taskflow edit <id> link "https://..."
 taskflow edit <id> plan "passo 1\npasso 2"
-taskflow tag <id> "tag1,tag2"
+taskflow tag <id> "tag"
 ```
 
 > Tasks com `due_date` definida são automaticamente promovidas para **TO DO** ao abrir o taskflow.
@@ -188,14 +214,43 @@ taskflow continue 2 "Etapa 3"   # cria #3, só aparece quando #2 for Done
 
 ---
 
+## Menu interativo (TUI)
+
+```bash
+taskflow tui
+```
+
+Abre um menu navegável com teclado. Sem dependências externas — usa `curses` da stdlib do Python.
+
+| Tela | Acesso | O que faz |
+|---|---|---|
+| Menu principal | — | Mostra stats e lista as opções |
+| Tasks pessoais | `k` | Kanban navegável: mover, adicionar, remover tasks |
+| Agent tasks | `a` | Lista com status, resultado e opção de cancelar |
+| Projetos | `p` | Lista projetos; Enter abre detalhes com tasks vinculadas |
+| Filtrar por tag | `f` | Pede uma tag e mostra o kanban filtrado |
+| Buscar tasks | `s` | Pesquisa por título ou descrição |
+| Tasks ocultas | `h` | Lista tasks com `hidden = 1` |
+
+**Atalhos globais:** `↑↓` navegar · `Enter` selecionar · `ESC` voltar ao menu · `q` sair
+
+**Atalhos no kanban:** `←→` mudar coluna · `t/d/b` mover task · `a` adicionar · `x` remover
+
+> **Nota:** `taskflow tui` requer um terminal real (TTY). Não funciona dentro de ambientes sem TTY como pipes ou alguns emuladores de terminal embutidos.
+
+---
+
 ## Agent tasks
 
 Tasks executadas automaticamente pelo Claude Code no horário agendado.
 
 ```bash
 taskflow agent                    # Board de agente (PENDING/RUNNING/DONE/FAILED/CANCELLED)
-taskflow agent add "título" "action prompt" "YYYY-MM-DD HH:MM"
-taskflow agent show <id>          # Detalhes de uma agent task (action, status, resultado)
+taskflow agent add "título" "action prompt" "YYYY-MM-DD HH:MM" \
+  --desc "descrição opcional" \
+  --tag "tag" \
+  --project "NomeDoProjeto"
+taskflow agent show <id>          # Detalhes de uma agent task
 taskflow agent list               # Lista todas as agent tasks
 taskflow agent cancel <id>        # Cancela uma task pendente
 taskflow agent rm <id>            # Remove uma agent task
@@ -208,7 +263,7 @@ taskflow agent rm <id>            # Remove uma agent task
 | Estado | Significado |
 |---|---|
 | `pending` | Agendada, ainda não executou |
-| `running` | Claude está a executar agora |
+| `running` | Claude está executando agora |
 | `done` | Concluída com sucesso |
 | `failed` | Claude tentou mas encontrou erro |
 | `cancelled` | Cancelada manualmente |
@@ -221,7 +276,7 @@ crontab -e
 
 Adicionar a linha:
 ```
-*/5 * * * * cd /caminho/para/taskflow && python3 /caminho/para/taskflow/taskflow_agent.py >> /caminho/para/taskflow/agent.log 2>&1
+*/5 * * * * python3 ~/.claude/skills/taskflow/taskflow_agent.py >> ~/.local/share/taskflow/agent.log 2>&1
 ```
 
 ### Configurar o agendador (Windows)
@@ -231,46 +286,27 @@ Usar o **Agendador de Tarefas do Windows** (Task Scheduler):
 1. Abrir `taskschd.msc`
 2. Criar tarefa básica
 3. Gatilho: repetir a cada 5 minutos
-4. Ação: `python C:\caminho\taskflow\taskflow_agent.py`
-5. Iniciar em: `C:\caminho\taskflow\`
+4. Ação: `python %USERPROFILE%\.claude\skills\taskflow\taskflow_agent.py`
 
 ### Requisito para agent tasks
 
 O `claude` CLI deve estar instalado e acessível:
 
 ```bash
-# Linux/macOS
 which claude   # deve retornar o caminho
-
-# Windows
-where claude
-```
-
-Se necessário, editar o caminho em `taskflow_agent.py`:
-```python
-CLAUDE_BIN = "/home/user/.local/bin/claude"  # Linux/macOS
-# CLAUDE_BIN = "claude"                       # Windows (se estiver no PATH)
 ```
 
 ### Como o agente executa uma task
 
-O agente não envia apenas o prompt cru ao Claude. Ele constrói um **prompt enriquecido** com contexto da task e instrui o Claude a terminar sempre com um marcador estruturado:
+O agente constrói um **prompt enriquecido** com contexto da task e instrui o Claude a terminar com um marcador estruturado:
 
 ```
 ---TASKFLOW_RESULT---
 STATUS: done
-SUMMARY: resume do que foi feito
+SUMMARY: resumo do que foi feito
 ```
 
-ou, em caso de falha:
-
-```
----TASKFLOW_RESULT---
-STATUS: failed
-SUMMARY: o que tentou e por que falhou
-```
-
-O agente lê este marcador para determinar o status real — não o exit code do processo. O `SUMMARY` é guardado em `action_result` e visível em `taskflow agent list`.
+O `SUMMARY` é guardado em `action_result` e visível em `taskflow agent list`.
 
 ### Estados e transições
 
@@ -280,26 +316,30 @@ PENDING → RUNNING → DONE      (Claude reportou STATUS: done)
          (manual) → CANCELLED
 ```
 
-Tasks em `FAILED` ficam paradas. Não há retry automático — o utilizador decide o que fazer.
+Tasks em `FAILED` ficam paradas. Não há retry automático.
 
 ### Limites do agente
 
 - Máximo **5 tasks por dia** (configurável em `taskflow_agent.py` via `MAX_PER_DAY`)
 - Timeout de **5 minutos** por task (`TASK_TIMEOUT`)
-- Log completo em `agent.log`
+- Log em `~/.local/share/taskflow/agent.log`
 
 ---
 
 ## Estrutura do projeto
 
 ```
-taskflow/
+~/.claude/skills/taskflow/
+├── SKILL.md             # Instruções para o Claude Code (skill)
 ├── taskflow.py          # CLI principal
 ├── tasks.py             # Funções de gestão de tasks e projetos
 ├── db.py                # Conexão e migrações do SQLite
 ├── board.py             # Renderização do kanban no terminal
 ├── tui.py               # Menu interativo completo (curses)
 ├── taskflow_agent.py    # Daemon de execução de agent tasks
+└── README.md            # Este arquivo
+
+~/.local/share/taskflow/
 ├── taskflow.db          # Banco de dados SQLite (gerado automaticamente)
 └── agent.log            # Log de execuções do agente (gerado automaticamente)
 ```
@@ -309,7 +349,6 @@ taskflow/
 ## Schema do banco de dados
 
 ```sql
--- Tasks (pessoais e de agente)
 CREATE TABLE tasks (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     title         TEXT    NOT NULL,
@@ -322,16 +361,16 @@ CREATE TABLE tasks (
     link          TEXT    DEFAULT '',
     plan          TEXT    DEFAULT '',
     project_id    INTEGER DEFAULT NULL,
-    scheduled_at  TEXT    DEFAULT NULL,       -- agent tasks
-    action        TEXT    DEFAULT NULL,       -- prompt para o Claude
+    scheduled_at  TEXT    DEFAULT NULL,
+    action        TEXT    DEFAULT NULL,
     action_status TEXT    DEFAULT NULL,       -- pending | running | done | failed | cancelled
     action_result TEXT    DEFAULT NULL,
     recurrence    TEXT    DEFAULT NULL,
+    is_agent      INTEGER DEFAULT 0,
     created_at    TEXT    DEFAULT (datetime('now', 'localtime')),
     updated_at    TEXT    DEFAULT (datetime('now', 'localtime'))
 );
 
--- Projetos
 CREATE TABLE projects (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT    NOT NULL,
@@ -342,7 +381,6 @@ CREATE TABLE projects (
     updated_at  TEXT    DEFAULT (datetime('now', 'localtime'))
 );
 
--- Relações entre tasks
 CREATE TABLE task_relations (
     from_task_id INTEGER NOT NULL,
     to_task_id   INTEGER NOT NULL,

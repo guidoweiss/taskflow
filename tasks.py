@@ -12,13 +12,13 @@ COLS = "id, title, description, tags, status, priority, due_date, hidden, link, 
 
 def add_task(title: str, description: str = "", status: str = "backlog",
              tags: str = "", priority: str = "", due_date: str = "",
-             link: str = "", plan: str = "") -> int:
+             link: str = "", plan: str = "", project_id: int = None) -> int:
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO tasks (title, description, tags, status, priority, due_date, link, plan)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """, (title, description, tags, status, priority, due_date, link, plan))
+        INSERT INTO tasks (title, description, tags, status, priority, due_date, link, plan, project_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (title, description, tags, status, priority, due_date, link, plan, project_id))
     new_id = cursor.lastrowid
     conn.commit()
     conn.close()
@@ -344,6 +344,15 @@ def add_project(name: str, description: str = "") -> int:
     return new_id
 
 
+def get_project_by_name(name: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM projects WHERE lower(name) = lower(?)", (name,))
+    row = cursor.fetchone()
+    conn.close()
+    return row
+
+
 def get_project(project_id: int):
     conn = get_connection()
     cursor = conn.cursor()
@@ -461,13 +470,13 @@ def get_tasks_by_project(project_id: int) -> list:
 # ── Agent tasks ──────────────────────────────────────────────────────────────
 
 def add_agent_task(title: str, action: str, scheduled_at: str,
-                   description: str = "", project_id: int = None) -> int:
+                   description: str = "", project_id: int = None, tags: str = "") -> int:
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO tasks (title, description, project_id, status, action, scheduled_at, action_status, is_agent)
-        VALUES (?, ?, ?, 'backlog', ?, ?, 'pending', 1)
-    """, (title, description, project_id, action, scheduled_at))
+        INSERT INTO tasks (title, description, tags, project_id, status, action, scheduled_at, action_status, is_agent)
+        VALUES (?, ?, ?, ?, 'backlog', ?, ?, 'pending', 1)
+    """, (title, description, tags, project_id, action, scheduled_at))
     new_id = cursor.lastrowid
     conn.commit()
     conn.close()
