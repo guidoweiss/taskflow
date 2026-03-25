@@ -8,12 +8,14 @@ Gerenciador de tarefas pessoal no terminal com suporte a projetos, relações en
 
 - Board kanban no terminal (BACKLOG / TO DO / DONE)
 - **Menu interativo TUI** (`taskflow tui`) — navegação completa com teclado
+- **Interface gráfica GUI** (Tauri) — visualização e gestão com mouse
 - Projetos com marcação de favoritos
 - Relações entre tasks com desbloqueio automático (fila encadeada)
 - Promoção automática para TO DO quando há prazo definido
 - Board compacto (`mini`)
 - **Agent tasks** — tasks agendadas executadas automaticamente pelo Claude Code
 - **Skill para Claude Code** — o Claude usa o taskflow automaticamente ao conversar
+- **Consulta SQL direta** — acesso ao banco com queries `SELECT` em formato tabular ou JSON
 
 ---
 
@@ -49,6 +51,28 @@ source ~/.bashrc
 ```
 
 > **Nota:** O banco de dados fica em `~/.local/share/taskflow/taskflow.db` — fora do repositório e não versionado.
+
+### Interface Gráfica (GUI)
+
+Opcionalmente, você pode usar a interface gráfica Tauri:
+
+```bash
+# Entrar no diretório do projeto
+cd ~/.claude/skills/taskflow/taskflow-gui
+
+# Build (requer Rust e Node.js)
+npm install && npm run tauri build
+
+# Executar
+./src-tauri/target/release/taskflow-gui
+```
+
+A GUI exibe o kanban em 3 colunas, atualiza automaticamente e permite visualizar todas as tasks.
+
+**Requisitos para a GUI:**
+- Node.js 18+
+- Rust 1.70+
+- GTK 3 + WebKit2GTK
 
 ### Windows
 
@@ -156,6 +180,22 @@ taskflow tag <id> "tag"
 taskflow filter <tag>             # Filtra o board por tag
 taskflow search "termo"           # Busca em títulos e descrições
 ```
+
+---
+
+## Consulta SQL direta
+
+Para queries avançadas que os comandos CLI não cobrem:
+
+```bash
+# Formato tabular colorizado
+taskflow sql "SELECT id, title, status FROM tasks LIMIT 10"
+
+# Formato JSON
+taskflow sql "SELECT id, title FROM tasks LIMIT 5" --json
+```
+
+> Apenas queries `SELECT` são permitidas (proteção contra modificações acidentais).
 
 ---
 
@@ -337,6 +377,9 @@ Tasks em `FAILED` ficam paradas. Não há retry automático.
 ├── board.py             # Renderização do kanban no terminal
 ├── tui.py               # Menu interativo completo (curses)
 ├── taskflow_agent.py    # Daemon de execução de agent tasks
+├── taskflow-gui/        # Interface gráfica (Tauri + React)
+│   ├── src/             # Frontend React
+│   └── src-tauri/        # Backend Rust
 └── README.md            # Este arquivo
 
 ~/.local/share/taskflow/

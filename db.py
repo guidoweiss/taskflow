@@ -29,14 +29,28 @@ def init_db():
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS tasks (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            title       TEXT    NOT NULL,
-            description TEXT    DEFAULT '',
-            tags        TEXT    DEFAULT '',
-            status      TEXT    NOT NULL DEFAULT 'backlog'
-                            CHECK(status IN ('backlog', 'todo', 'done')),
-            created_at  TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
-            updated_at  TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            title            TEXT    NOT NULL,
+            description      TEXT    DEFAULT '',
+            tags             TEXT    DEFAULT '',
+            status           TEXT    DEFAULT 'backlog' CHECK(status IN ('backlog', 'todo', 'done')),
+            priority         TEXT    DEFAULT '' CHECK(priority IN ('alta', 'media', 'baixa')),
+            due_date         TEXT    DEFAULT '',
+            hidden           INTEGER DEFAULT 0,
+            link             TEXT    DEFAULT '',
+            plan             TEXT    DEFAULT '',
+            project_id       INTEGER DEFAULT NULL,
+            scheduled_at     TEXT    DEFAULT NULL,
+            action           TEXT    DEFAULT NULL,
+            action_status    TEXT    DEFAULT NULL,
+            action_result    TEXT    DEFAULT NULL,
+            recurrence       TEXT    DEFAULT NULL,
+            is_agent         INTEGER DEFAULT 0,
+            approved_plan_id INTEGER DEFAULT NULL,
+            created_at       TEXT    DEFAULT (datetime('now', 'localtime')),
+            updated_at       TEXT    DEFAULT (datetime('now', 'localtime')),
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL,
+            FOREIGN KEY (approved_plan_id) REFERENCES approved_plans(id) ON DELETE SET NULL
         )
     """)
 
@@ -95,6 +109,24 @@ def init_db():
             to_task_id   INTEGER NOT NULL,
             type         TEXT    NOT NULL DEFAULT 'continues',
             PRIMARY KEY (from_task_id, to_task_id)
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS approved_plans (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id          INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
+            project_id       INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+            project_path     TEXT    DEFAULT '',
+            title            TEXT    NOT NULL,
+            plan             TEXT    NOT NULL,
+            priority         TEXT    DEFAULT '',
+            importance_level TEXT    CHECK(importance_level IN ('backend','frontend','structural','other')),
+            approved_at      DATETIME DEFAULT (datetime('now', 'localtime')),
+            task_status      TEXT    DEFAULT '',
+            link             TEXT    DEFAULT '',
+            created_at       DATETIME DEFAULT (datetime('now', 'localtime')),
+            updated_at       DATETIME DEFAULT (datetime('now', 'localtime'))
         )
     """)
 
